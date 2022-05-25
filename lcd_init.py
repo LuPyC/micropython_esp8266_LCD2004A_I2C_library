@@ -127,9 +127,6 @@ from lcd_i2c import I2CLCD
 # I2C INITIALIZATION
 lcd = I2CLCD(5, 4, 0x27)
 
-pp = 'abcd'
-
-lcd.Print(pp)
 
 while True:
     try:
