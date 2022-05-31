@@ -12,19 +12,20 @@ class PCF8574I2C:
         self._i2c_addr = None
     
     def _wr_nibble(self, instr):
-            # Writing a nibble (4 bits) of data
+        # Writing a nibble (4 bits) of data
         self._i2c.writeto(self._i2c_addr, self._instr_set(ENABLE | instr))
-        # time.sleep_ms(5)
         self._i2c.writeto(self._i2c_addr, self._instr_set(instr))
-        # time.sleep_ms(1)
 
+    def _i2c_read(self):
+        # Reading 1 byte from peripheral
+        return self._i2c.readfrom(self._i2c_addr, 1)[0]
+    
     def _instr_set(self, instr):
         bts = bytearray(1)
         bts[0] = instr
         return bts
     
     def _wr_cmd(self, instr):
-        
         # Preparing data for 4-bit operation
         # Sending one byte of information in 2 pieces (nibbles)
         # Sending 4 higher bites and then 4 lower bites
@@ -50,3 +51,15 @@ class PCF8574I2C:
         # Lower nibble (4 bits)
         instr_low = RS | self.D3 | (instr & 0x0F) << 4
         self._wr_nibble(instr_low)
+    
+    def check_busy(self):
+        # Checks busy flag (pg. 9)
+        # I need to pull RW high to enable read operation
+        # Busy Flag will be on D7 (MSB)
+        self._wr_nibble(RW)          # CAREFUL ABOUT THIS, causes recursive call
+        
+        # Converting byte to raw bit format (e.g. 01011010)
+        bits = f'{self._i2c_read():0>8b}'
+        
+        # Checking MSB and returning True if busy, else otherwise
+        return True if bool(int(bits[0])) else False

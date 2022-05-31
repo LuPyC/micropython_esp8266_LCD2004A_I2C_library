@@ -68,14 +68,23 @@ class LCDAPI:
         self._wr_cmd(D3 | D2)
 
     # Basic low-level functions 
-
+    def check_busy():
+        # Checks busy flag
+        raise NotImplementedError("This method must be implemented in child class.")
+    
     def clear(self):
         # Defines Clear Display (pg. 41)
         self._wr_cmd(D0)
+        # This takes 2ms to be executed
+        time.sleep_ms(2)
+        self.curr_column = 0
+        self.curr_row = 0
     
     def home(self):
         # Defines Return Home (pg. 41)
         self._wr_cmd(D1)
+        self.curr_column = 0
+        self.curr_row = 0
     
     def entry_mode_set(self, shift_direction='R', shift_enable=True):
         # Defines Entry Mode Set (pg. 41)
@@ -140,3 +149,56 @@ class LCDAPI:
             cmd |= D2
         
         self._wr_cmd(cmd)
+    
+    def _set_DDRAM_address(self, address):
+        # Used to change actual DDRAM (display) address.
+        self._wr_cmd(D7 | address)
+    
+    # Custom Functions
+    def _display_addresses(self, rows, columns):
+        # Defines DDRAM addresses depending on display lines
+        # As datasheet states, we have only available 40 addresses per line
+        self.lines_addr = []            # NOTE: This should be defined in child class
+        if rows < 3:
+            for _ in range(rows):
+                self.lines_addr += [list(range(columns))]
+        else:
+            # In case of 3 or more lines, things changes. We have interleaved lines.
+            # The order observed is 1,3,2,4. So it needs to be mapped correctly
+            # Moreover, the two lines have not contiguous addresses, need to define them
+            # manually. Each line have 40 different addresses
+            line1 = list(range(40))
+            line2 = list(range(104)[64:])
+            
+            # Grabbing piece by piece what in line1/2. This is to assign correctly 
+            # addresses to each line
+            for row in range(rows):
+                if row % 2:
+                    self.lines_addr += [line2[(row//2)*columns:(row//2 + 1)*columns]]
+                else:
+                    self.lines_addr += [line1[(row//2)*columns:(row//2 + 1)*columns]]
+    
+    def cursor_move(self, row, column):
+        if row > self.rows or column > self.cols:
+            raise ValueError('Row/column value cannot exceed maximum rows/columns value.')
+        # addr = bytearray(1)
+        # addr[0] = 
+        self._set_DDRAM_address(self.lines_addr[row][column])
+    
+    def _newline_check(self):
+        # Function that checks where I'm trying to write and detects if a line change 
+        # is needed
+        if self.curr_column > self.cols - 1:
+            self.curr_row += 1
+            self.curr_column = 0
+            if self.curr_row > self.rows - 1:
+                self.curr_row = 0
+        
+            self.cursor_move(self.curr_row, self.curr_column)
+        
+if __name__ == '__main__':
+    test_class = LCDAPI()
+    
+    test_class._display_addresses(4, 20)
+    
+    pass
